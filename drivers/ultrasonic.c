@@ -101,33 +101,16 @@ double ultrasonic_get_stable_distance_cm(int num_samples,int delay_ms) {
     }
 
     double samples[num_samples];
-    int got = 0;
-    int attempts = 0;
 
-    while (got < num_samples) {
-        // Call this driver's single-shot measurement function
-        double d = ultrasonic_get_distance_cm(); 
-        attempts++;
-
-        if (d > 0.0 && d < 400.0) {
-            samples[got++] = d;
-        }
-
-        // Use the non-RTOS blocking delay
-        sleep_ms(delay_ms); 
+    for (int i = 0; i < num_samples; i++) {
+        samples[i] = ultrasonic_get_distance_cm();
+        sleep_ms(30); 
     }
 
-    if (got == 0) return 0.0; // No valid readings
+    qsort(samples, num_samples, sizeof(double), compare_double);
 
-    qsort(samples, got, sizeof(double), compare_double);
-    return samples[got/2]; 
+    return samples[num_samples / 2];
 }
-
-
-
-
-
-
 
 
 
