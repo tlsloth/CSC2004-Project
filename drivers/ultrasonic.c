@@ -1,4 +1,15 @@
 #include "ultrasonic.h"
+#include "pico/stdlib.h"
+#include "pico/time.h"
+#include "hardware/gpio.h"
+//#include "FreeRTOS.h"
+//#include "task.h"
+#include <stdint.h>     // ← added for uintptr_t
+#include <stdbool.h>
+#include <stdlib.h>  
+
+// if you need motor API:
+#include "motor.h" // adjust if different
 
 // pins (set by init)
 static uint ULTRA_TRIG_PIN = 4;
@@ -81,24 +92,50 @@ static int compare_double(const void *a, const void *b) {
     return 0;
 }
 
-// helper: median of N samples (ignores zeros)
-static double get_stable_distance(int samples, int delay_ms) {
-    if (samples % 2 == 0) samples++;
-    double buf[samples];
+
+
+
+double ultrasonic_get_stable_distance_cm(int num_samples,int delay_ms) {
+    if (num_samples % 2 == 0){
+        num_samples++; 
+    }
+
+    double samples[num_samples];
     int got = 0;
     int attempts = 0;
-    int max_attempts = samples * 4;
-    while (got < samples && attempts < max_attempts) {
-        double d = ultrasonic_get_distance_cm();
+
+    while (got < num_samples) {
+        // Call this driver's single-shot measurement function
+        double d = ultrasonic_get_distance_cm(); 
         attempts++;
-        if (d > 0.0 && d < 400.0) buf[got++] = d;
-        vTaskDelay(pdMS_TO_TICKS(delay_ms));
+
+        if (d > 0.0 && d < 400.0) {
+            samples[got++] = d;
+        }
+
+        // Use the non-RTOS blocking delay
+        sleep_ms(delay_ms); 
     }
-    if (got == 0) return 0.0;
-    qsort(buf, got, sizeof(double), compare_double); // ← use compare_double
-    return buf[got/2];
+
+    if (got == 0) return 0.0; // No valid readings
+
+    qsort(samples, got, sizeof(double), compare_double);
+    return samples[got/2]; 
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 // Monitor task: poll distance and stop/resume motors
 static void ultrasonic_monitor_task(void *pv) {
     // interpret pv as poll_ms passed from xTaskCreate (cast via uintptr_t)
@@ -132,4 +169,5 @@ void ultrasonic_start_monitor_task(uint32_t poll_ms, double stop_cm, double clea
     BaseType_t rc = xTaskCreate(ultrasonic_monitor_task, "UltraMon", 1024, NULL, tskIDLE_PRIORITY + 2, NULL);
     (void)rc;
 }
-// ...existing code...
+
+*/
