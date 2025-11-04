@@ -31,17 +31,21 @@
 #define ULTRASONIC_ECHO_PIN 5 //for receive ultrasonic pulse 
 
 #define SERVO_PIN 15
+#define SERVO_SCAN_START_ANGLE 30
+#define SERVO_SCAN_END_ANGLE 150
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
+
+
 typedef struct {
     bool obstacle_found;
     double width_cm;
     double distance_cm;
-    int left_edge_angle;
     int right_edge_angle;
+    int left_edge_angle;
 } ScanResult;
 
 double angle_to_radians(int angle) {
@@ -54,17 +58,15 @@ ScanResult measure_obstacle_width(double obstacle_cm) {
         .obstacle_found = false,
         .width_cm = 0.0,
         .distance_cm = obstacle_cm, // Store the initial distance
-        .left_edge_angle = -1,
-        .right_edge_angle = -1
+        .right_edge_angle = -1,
+        .left_edge_angle = -1
     };
 
-    const int SERVO_SCAN_START_ANGLE = 30; 
-    const int SERVO_SCAN_END_ANGLE = 150;
     const int SERVO_SCAN_STEP = 3; 
     const int SCAN_OBSTACLE_THRESHOLD = 30;
 
-    int left_edge_angle = -1;
     int right_edge_angle = -1;
+    int left_edge_angle = -1;
     double dist_cm;
 
     printf("\n--- Starting Scan (30-150 deg) ---\n");
@@ -80,11 +82,11 @@ ScanResult measure_obstacle_width(double obstacle_cm) {
 
         if (dist_cm > 0 && dist_cm < SCAN_OBSTACLE_THRESHOLD) {
             // --- Obstacle IS seen ---
-            if (left_edge_angle == -1) {
-                left_edge_angle = angle; // First detection
-                printf("  -> Found left edge at %d deg\n", left_edge_angle);
+            if (right_edge_angle == -1) {
+                right_edge_angle = angle; // First detection
+                printf("  -> Found left edge at %d deg\n", right_edge_angle);
             }
-            right_edge_angle = angle; // Always update right edge
+            left_edge_angle = angle; // Always update right edge
         } 
     }
     
@@ -93,19 +95,19 @@ ScanResult measure_obstacle_width(double obstacle_cm) {
     printf("--- Scan Complete. Returning to 90 deg ---\n");
 
     // --- Calculate width ---
-    if (left_edge_angle != -1 && right_edge_angle > left_edge_angle) {
-        printf("  -> Found right edge at %d deg\n", right_edge_angle);
+    if (right_edge_angle != -1 && left_edge_angle > right_edge_angle) {
+        printf("  -> Found right edge at %d deg\n", left_edge_angle);
         printf("  -> Using distance: %.1f cm\n", obstacle_cm);
         
-        double angle_diff_deg = (double)(right_edge_angle - left_edge_angle);
+        double angle_diff_deg = (double)(left_edge_angle - right_edge_angle);
         double angle_half_rad = (angle_diff_deg / 2.0) * M_PI / 180.0;
         double width = 2.0 * obstacle_cm * tan(angle_half_rad);
 
         printf("  -> Calculated width: %.2f cm\n", width);
         result.obstacle_found = true;
         result.width_cm = width;
-        result.left_edge_angle = left_edge_angle;
         result.right_edge_angle = right_edge_angle;
+        result.left_edge_angle = left_edge_angle;
         return result;
     }
     
@@ -233,12 +235,23 @@ int main() {
             if (scan.obstacle_found) {
                 printf("\n+++ RESULT: Obstacle Scan Complete +++\n");
                 printf("  -> Width:   %.2f cm\n", scan.width_cm);
-                printf("  -> Edges:   %d deg (L) to %d deg (R)\n", 
-                       scan.left_edge_angle, scan.right_edge_angle);
+                printf("  -> Edges:   %d deg (L) to %d deg (R)\n", scan.right_edge_angle, scan.left_edge_angle);
+
+                int leftgap=scan.right_edge_angle-SERVO_SCAN_START_ANGLE;
+                int rightgap=SERVO_SCAN_END_ANGLE-scan.left_edge_angle;
+                if (leftgap > rightgap) {
+                    printf("DECISION: Turning RIGHT\n");
+                } 
+                else {
+                    printf("DECISION: Turning LEFT\n");
+                }
             } else {
                 printf("\n+++ RESULT: Scan complete. Could not measure width. +++\n");
             }
             
+
+
+
             printf("Post-scan check...\n");
             double d_check = ultrasonic_get_stable_distance_cm(3, 10);
             
@@ -251,10 +264,9 @@ int main() {
                 last_obstacle_distance = d_check;
                 sleep_ms(2000);
             }
-        }
-        
         sleep_ms(LOOP_DELAY_MS);
-    }
+        }
+}
 #else
     while (1) {
         // Read raw sensor value
