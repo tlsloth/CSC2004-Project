@@ -18,6 +18,7 @@
 #define LOOP_DELAY_MS 10            // Control loop period (~100Hz)
 #define TELEMETRY_INTERVAL_MS 200   // Telemetry reporting interval (~5Hz)
 #define CALIBRATION_MODE 0          // Set to 1 to enable calibration mode (motors off)
+#define STRAIGHT_MODE 1             // Set to 1 to drive straight (no PID), 0 for line following
 
 // PID Gains for line following
 #define KP 0.20f                    // Proportional gain (reduced further for smoother response)
@@ -73,6 +74,35 @@ int main() {
     float previous_error = 0.0f;
     float integral = 0.0f;
 
+#if STRAIGHT_MODE
+    printf("\n*** STRAIGHT MODE - DRIVING FORWARD (NO PID) ***\n");
+    printf("Both motors running at BASE_SPEED=%.2f\n", BASE_SPEED);
+    printf("Use this mode for testing other sensors\n\n");
+    
+    while (1) {
+        // Read sensor for telemetry only
+        uint16_t raw_value = line_sensor_read_raw();
+        
+        // Drive straight - both motors same speed
+        motor_set_speed(BASE_SPEED, BASE_SPEED);
+        
+        // Telemetry
+        if (to_ms_since_boot(get_absolute_time()) - telemetry_timer >= TELEMETRY_INTERVAL_MS) {
+            telemetry_timer = to_ms_since_boot(get_absolute_time());
+            
+            float distance = encoder_get_distance_m();
+            
+            printf("\n=== STRAIGHT MODE ===\n");
+            printf("Raw ADC: %u\n", raw_value);
+            printf("Motors: L=%.2f  R=%.2f (equal speeds)\n", BASE_SPEED, BASE_SPEED);
+            printf("Distance: %.2f m\n", distance);
+            printf("*** DRIVING STRAIGHT - NO LINE FOLLOWING ***\n");
+            printf("==========================\n");
+        }
+        
+        sleep_ms(LOOP_DELAY_MS);
+    }
+#else
     while (1) {
         // Read raw sensor value
         uint16_t raw_value = line_sensor_read_raw();
@@ -149,6 +179,7 @@ int main() {
 
         sleep_ms(LOOP_DELAY_MS);
     }
+#endif
 
     return 0;
 }
