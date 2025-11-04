@@ -1,0 +1,150 @@
+#include <stdio.h>
+#include "pico/stdlib.h"
+
+// Hardware drivers
+#include "drivers/motor.h"
+#include "drivers/encoder.h"
+#include "drivers/pid.h"
+#include "drivers/ir_sensor.h"
+
+// ===== Configuration =====
+#define BASE_SPEED 0.30f            // Base speed (reduced for stability)
+#define MAX_CORRECTION 0.20f        // Maximum correction (reduced to prevent wild turns)
+#define SENSOR_OFFSET 0.0f          // No sensor offset
+#define ERROR_DEADBAND 0.05f        // Small deadband for straight line stability
+#define LOOP_DELAY_MS 10            // Control loop period (~100Hz)
+#define TELEMETRY_INTERVAL_MS 200   // Telemetry reporting interval (~5Hz)
+#define CALIBRATION_MODE 0          // Set to 1 to enable calibration mode (motors off)
+
+// PID Gains for line following
+#define KP 0.25f                    // Proportional gain (much lower for smooth response)
+#define KI 0.002f                   // Integral gain (very low)
+#define KD 0.08f                    // Derivative gain (reduced to prevent oscillation)
+
+int main() {
+    stdio_init_all();
+    sleep_ms(2000); // Wait for USB serial
+
+    printf("\n=== PID Line Following Robot ===\n");
+
+    // Initialize hardware
+    motor_init();
+    encoder_init();
+    pid_init();
+    line_sensor_init();
+    
+    printf("\n=== INITIAL SENSOR CHECK ===\n");
+    sleep_ms(500);
+    for (int i = 0; i < 5; i++) {
+        uint16_t raw = line_sensor_read_raw();
+        line_state_t state = line_sensor_read();
+        printf("Reading %d: Raw=%u, State=%s\n", i+1, raw, state == LINE_BLACK ? "BLACK" : "WHITE");
+        sleep_ms(200);
+    }
+    printf("Starting line following in 2 seconds...\n");
+    sleep_ms(2000);
+
+#if CALIBRATION_MODE
+    printf("\n*** CALIBRATION MODE ***\n");
+    printf("Place sensor over WHITE surface, then BLACK surface\n");
+    printf("Watch the RAW ADC values to set the threshold\n\n");
+    
+    uint16_t min_value = 4095, max_value = 0;
+    
+    while (1) {
+        uint16_t raw = line_sensor_read_raw();
+        
+        if (raw < min_value) min_value = raw;
+        if (raw > max_value) max_value = raw;
+        
+        printf("RAW: %4u  |  MIN: %4u  |  MAX: %4u  |  SUGGESTED THRESHOLD: %4u\n", 
+               raw, min_value, max_value, (min_value + max_value) / 2);
+        
+        sleep_ms(100);
+    }
+#endif
+
+    uint32_t telemetry_timer = 0;
+    
+    // PID variables
+    float previous_error = 0.0f;
+    float integral = 0.0f;
+
+    while (1) {
+        // Read raw sensor value
+        uint16_t raw_value = line_sensor_read_raw();
+        
+        // Calculate error from threshold (centerline)
+        // error > 0 means sensor is on black (need to turn left to center)
+        // error < 0 means sensor is on white (need to turn right to find line)
+        float error = (float)((int16_t)raw_value - 2081) / 2081.0f;
+        
+        // Clamp error to reasonable range
+        if (error > 1.0f) error = 1.0f;
+        if (error < -1.0f) error = -1.0f;
+        
+        // Apply sensor offset compensation
+        error += SENSOR_OFFSET;
+        
+        // Apply deadband filter - ignore small errors on straight lines
+        if (error > -ERROR_DEADBAND && error < ERROR_DEADBAND) {
+            error = 0.0f;
+        }
+        
+        // PID calculation
+        float P = KP * error;
+        integral += error * (LOOP_DELAY_MS / 1000.0f);
+        float I = KI * integral;
+        float derivative = (error - previous_error) / (LOOP_DELAY_MS / 1000.0f);
+        float D = KD * derivative;
+        
+        previous_error = error;
+        
+        // Anti-windup for integral
+        if (integral > 100.0f) integral = 100.0f;
+        if (integral < -100.0f) integral = -100.0f;
+        
+        // Calculate correction
+        float correction = P + I + D;
+        
+        // Clamp correction
+        if (correction > MAX_CORRECTION) correction = MAX_CORRECTION;
+        if (correction < -MAX_CORRECTION) correction = -MAX_CORRECTION;
+        
+        // Apply differential steering
+        // Positive correction = turn left (slow down left motor)
+        // Negative correction = turn right (slow down right motor)
+        float left_speed = BASE_SPEED - correction;
+        float right_speed = BASE_SPEED + correction;
+        
+        // Ensure speeds stay in valid range
+        if (left_speed < 0.0f) left_speed = 0.0f;
+        if (left_speed > 1.0f) left_speed = 1.0f;
+        if (right_speed < 0.0f) right_speed = 0.0f;
+        if (right_speed > 1.0f) right_speed = 1.0f;
+
+        // Apply motor speeds
+        if (!CALIBRATION_MODE) {
+            motor_set_speed(left_speed, right_speed);
+        }
+
+        // ----- Telemetry -----
+        telemetry_timer += LOOP_DELAY_MS;
+        if (telemetry_timer >= TELEMETRY_INTERVAL_MS) {
+            telemetry_timer = 0;
+            float distance = encoder_get_distance_m();
+
+            printf("\n=== PID LINE FOLLOWING ===\n");
+            printf("Raw ADC: %u  |  Error: %.3f (with offset)\n", raw_value, error);
+            printf("P=%.3f  I=%.3f  D=%.3f  |  Corr=%.3f\n", P, I, D, correction);
+            printf("Motors: L=%.2f  R=%.2f\n", left_speed, right_speed);
+            printf("Distance: %.2f m\n", distance);
+            printf("*** PID-ONLY FIRMWARE - NO SEARCH MODE ***\n");
+            printf("==========================\n");
+        }
+
+        sleep_ms(LOOP_DELAY_MS);
+    }
+
+    return 0;
+}
