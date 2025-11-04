@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "pico/stdlib.h"
 
 // Hardware drivers
@@ -6,20 +7,22 @@
 #include "drivers/encoder.h"
 #include "drivers/pid.h"
 #include "drivers/ir_sensor.h"
+#include "drivers/barcode.h"
+
 
 // ===== Configuration =====
 #define BASE_SPEED 0.30f            // Base speed (reduced for stability)
 #define MAX_CORRECTION 0.20f        // Maximum correction (reduced to prevent wild turns)
-#define SENSOR_OFFSET 0.0f          // No sensor offset
-#define ERROR_DEADBAND 0.05f        // Small deadband for straight line stability
+#define SENSOR_OFFSET 0.0f          // No offset - aim for true center-line tracking
+#define ERROR_DEADBAND 0.08f        // Increased deadband to reduce oscillation on line edge
 #define LOOP_DELAY_MS 10            // Control loop period (~100Hz)
 #define TELEMETRY_INTERVAL_MS 200   // Telemetry reporting interval (~5Hz)
 #define CALIBRATION_MODE 0          // Set to 1 to enable calibration mode (motors off)
 
 // PID Gains for line following
-#define KP 0.25f                    // Proportional gain (much lower for smooth response)
-#define KI 0.002f                   // Integral gain (very low)
-#define KD 0.08f                    // Derivative gain (reduced to prevent oscillation)
+#define KP 0.20f                    // Proportional gain (reduced further for smoother response)
+#define KI 0.0f                     // Integral gain (disabled to prevent windup during oscillations)
+#define KD 0.02f                    // Derivative gain (dramatically reduced - was causing wild swings)
 
 int main() {
     stdio_init_all();
@@ -75,9 +78,10 @@ int main() {
         uint16_t raw_value = line_sensor_read_raw();
         
         // Calculate error from threshold (centerline)
-        // error > 0 means sensor is on black (need to turn left to center)
-        // error < 0 means sensor is on white (need to turn right to find line)
-        float error = (float)((int16_t)raw_value - 2081) / 2081.0f;
+        // Center-line tracking: threshold set to middle of black line (~1350)
+        // error > 0 means sensor is deeper into black (turn left to get back to center)
+        // error < 0 means sensor is on white/edge (turn right to get back to center)
+        float error = (float)((int16_t)raw_value - 1350) / 1350.0f;
         
         // Clamp error to reasonable range
         if (error > 1.0f) error = 1.0f;
