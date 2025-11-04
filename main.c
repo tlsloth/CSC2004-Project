@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
+#include <stdlib.h>
 #include "pico/stdlib.h"
 
 // Hardware drivers
@@ -8,6 +10,7 @@
 #include "drivers/pid.h"
 #include "drivers/ir_sensor.h"
 #include "drivers/ultrasonic.h"
+#include "drivers/servo.h"
 
 // ===== Configuration =====
 #define BASE_SPEED 0.30f            // Base speed (reduced for stability)
@@ -24,6 +27,93 @@
 #define KI 0.0f                     // Integral gain (disabled to prevent windup during oscillations)
 #define KD 0.02f                    // Derivative gain (dramatically reduced - was causing wild swings)
 
+#define ULTRASONIC_TRIG_PIN 4 //for send ultrasonic pulse
+#define ULTRASONIC_ECHO_PIN 5 //for receive ultrasonic pulse 
+
+#define SERVO_PIN 15
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+typedef struct {
+    bool obstacle_found;
+    double width_cm;
+    double distance_cm;
+    int left_edge_angle;
+    int right_edge_angle;
+} ScanResult;
+
+double angle_to_radians(int angle) {
+    return angle * M_PI / 180.0;
+}
+
+ScanResult measure_obstacle_width(double obstacle_cm) {
+    // --- Initialize the result struct to a "failure" state ---
+    ScanResult result = {
+        .obstacle_found = false,
+        .width_cm = 0.0,
+        .distance_cm = obstacle_cm, // Store the initial distance
+        .left_edge_angle = -1,
+        .right_edge_angle = -1
+    };
+
+    const int SERVO_SCAN_START_ANGLE = 30; 
+    const int SERVO_SCAN_END_ANGLE = 150;
+    const int SERVO_SCAN_STEP = 3; 
+    const int SCAN_OBSTACLE_THRESHOLD = 30;
+
+    int left_edge_angle = -1;
+    int right_edge_angle = -1;
+    double dist_cm;
+
+    printf("\n--- Starting Scan (30-150 deg) ---\n");
+
+    for (int angle = SERVO_SCAN_START_ANGLE; angle <= SERVO_SCAN_END_ANGLE; angle += SERVO_SCAN_STEP) {
+        servo_set_angle(SERVO_PIN,angle);
+        sleep_ms(50);
+
+        // Use the ultrasonic driver's "stable distance" function
+        dist_cm = ultrasonic_get_stable_distance_cm(3, 20);
+        
+        printf("Angle: %3d, Dist: %5.1f cm\n", angle, dist_cm);
+
+        if (dist_cm > 0 && dist_cm < SCAN_OBSTACLE_THRESHOLD) {
+            // --- Obstacle IS seen ---
+            if (left_edge_angle == -1) {
+                left_edge_angle = angle; // First detection
+                printf("  -> Found left edge at %d deg\n", left_edge_angle);
+            }
+            right_edge_angle = angle; // Always update right edge
+        } 
+    }
+    
+    // Point servo back to center after scan
+    servo_set_angle(SERVO_PIN,90);
+    printf("--- Scan Complete. Returning to 90 deg ---\n");
+
+    // --- Calculate width ---
+    if (left_edge_angle != -1 && right_edge_angle > left_edge_angle) {
+        printf("  -> Found right edge at %d deg\n", right_edge_angle);
+        printf("  -> Using distance: %.1f cm\n", obstacle_cm);
+        
+        double angle_diff_deg = (double)(right_edge_angle - left_edge_angle);
+        double angle_half_rad = (angle_diff_deg / 2.0) * M_PI / 180.0;
+        double width = 2.0 * obstacle_cm * tan(angle_half_rad);
+
+        printf("  -> Calculated width: %.2f cm\n", width);
+        result.obstacle_found = true;
+        result.width_cm = width;
+        result.left_edge_angle = left_edge_angle;
+        result.right_edge_angle = right_edge_angle;
+        return result;
+    }
+    
+    printf("  -> Could not determine obstacle edges.\n");
+    return result;
+}
+
+
 int main() {
     stdio_init_all();
     sleep_ms(2000); // Wait for USB serial
@@ -35,9 +125,12 @@ int main() {
     encoder_init();
     pid_init();
     line_sensor_init();
-    ultrasonic_init_pins(4, 5);
+    ultrasonic_init_pins(ULTRASONIC_TRIG_PIN, ULTRASONIC_ECHO_PIN);
     //ultrasonic_start_monitor_task(100 /*poll ms*/, 20.0 /*stop_cm*/, 25.0 /*clear_cm*/);
-    
+    servo_init(SERVO_PIN);
+
+    servo_set_angle(SERVO_PIN, 90);
+
     printf("\n=== INITIAL SENSOR CHECK ===\n");
     sleep_ms(500);
     for (int i = 0; i < 5; i++) {
@@ -77,48 +170,87 @@ int main() {
 
 #if STRAIGHT_MODE
     printf("\n*** STRAIGHT MODE - DRIVING FORWARD (NO PID) ***\n");
-    printf("Both motors running at BASE_SPEED=%.2f\n", BASE_SPEED);
     printf("Use this mode for testing other sensors\n\n");
     uint32_t last_ultra_ms = to_ms_since_boot(get_absolute_time());
-    bool obstacle_active = false;
     const double STOP_CM = 20.0;
-    const double CLEAR_CM = 25.0;
     const int POLL_MS = 20;
+    double last_obstacle_distance = 0.0;
+
+    enum RobotState {
+        STATE_DRIVING,     // Looking for obstacles
+        STATE_SCANNING,    // Obstacle found, stopped, running scan
+    };
+
+    enum RobotState state = STATE_DRIVING;
     
     while (1) {
-        // Read sensor for telemetry only
-        uint16_t raw_value = line_sensor_read_raw();
-        
-        
-        // Telemetry
-        if (to_ms_since_boot(get_absolute_time()) - telemetry_timer >= TELEMETRY_INTERVAL_MS) {
-            telemetry_timer = to_ms_since_boot(get_absolute_time());
-            
-            float distance = encoder_get_distance_m();
-            /*
-            printf("\n=== STRAIGHT MODE ===\n");
-            printf("Raw ADC: %u\n", raw_value);
-            printf("Motors: L=%.2f  R=%.2f (equal speeds)\n", BASE_SPEED, BASE_SPEED);
-            printf("Distance: %.2f m\n", distance);
-            printf("*** DRIVING STRAIGHT - NO LINE FOLLOWING ***\n");
-            printf("==========================\n");
-            */
-            
-        }
 
-        if ((int)(to_ms_since_boot(get_absolute_time()) - last_ultra_ms) >= POLL_MS) {
-            last_ultra_ms = to_ms_since_boot(get_absolute_time());
-            double d = ultrasonic_get_stable_distance_cm(3, 10);
-            printf("Ultrasonic Distance measured: %.2f cm\n", d);
-            if (d > 0.0 && !obstacle_active && d <= STOP_CM) {
-                motor_set_speed(0.0f, 0.0f);
-                obstacle_active = true;
-            } else if (obstacle_active && d >= CLEAR_CM) {
-                obstacle_active = false;
+        if (state == STATE_DRIVING){
+            // Read sensor for telemetry only
+            uint16_t raw_value = line_sensor_read_raw();
+            // Telemetry
+            if (to_ms_since_boot(get_absolute_time()) - telemetry_timer >= TELEMETRY_INTERVAL_MS) {
+                telemetry_timer = to_ms_since_boot(get_absolute_time());
+                
+                float distance = encoder_get_distance_m();
+                /*
+                printf("\n=== STRAIGHT MODE ===\n");
+                printf("Raw ADC: %u\n", raw_value);
+                printf("Motors: L=%.2f  R=%.2f (equal speeds)\n", BASE_SPEED, BASE_SPEED);
+                printf("Distance: %.2f m\n", distance);
+                printf("*** DRIVING STRAIGHT - NO LINE FOLLOWING ***\n");
+                printf("==========================\n");
+                */
+                
+            }
+
+            if ((int)(to_ms_since_boot(get_absolute_time()) - last_ultra_ms) >= POLL_MS) {
+                last_ultra_ms = to_ms_since_boot(get_absolute_time());
+                
+                double d = ultrasonic_get_stable_distance_cm(3, 10);
+                printf("Dist: %.2f cm\n", d);
+
+                if (d > 0.0 && d <= STOP_CM) {
+                    printf("\n!!! Obstacle DETECTED at %.1f cm !!!\n", d);
+                    last_obstacle_distance = d;
+                    state = STATE_SCANNING;
+                }
             }
         }
-        if (!obstacle_active){
+
+        if (state==STATE_DRIVING){
             motor_set_speed(BASE_SPEED, BASE_SPEED);
+        }
+        else if (state == STATE_SCANNING) {
+            // Action: Stop, scan, and decide what to do next
+            
+            motor_set_speed(0.0f, 0.0f); // Ensure we are stopped
+            
+            // 1. Run the blocking scan
+            ScanResult scan = measure_obstacle_width(last_obstacle_distance);
+            
+            // 2. Print results (you can add your navigation logic here)
+            if (scan.obstacle_found) {
+                printf("\n+++ RESULT: Obstacle Scan Complete +++\n");
+                printf("  -> Width:   %.2f cm\n", scan.width_cm);
+                printf("  -> Edges:   %d deg (L) to %d deg (R)\n", 
+                       scan.left_edge_angle, scan.right_edge_angle);
+            } else {
+                printf("\n+++ RESULT: Scan complete. Could not measure width. +++\n");
+            }
+            
+            printf("Post-scan check...\n");
+            double d_check = ultrasonic_get_stable_distance_cm(3, 10);
+            
+            if (d_check >= STOP_CM) {
+                printf("  -> Post-scan dist: %.1f cm. Obstacle is CLEAR.\n", d_check);
+                state = STATE_DRIVING;
+            } else {
+                // The obstacle is still there (d_check < 28.0)
+                printf("  -> Post-scan dist: %.1f cm. Obstacle still present.\n", d_check);
+                last_obstacle_distance = d_check;
+                sleep_ms(2000);
+            }
         }
         
         sleep_ms(LOOP_DELAY_MS);
