@@ -36,7 +36,7 @@ int main() {
     pid_init();
     line_sensor_init();
     ultrasonic_init_pins(4, 5);
-    ultrasonic_start_monitor_task(100 /*poll ms*/, 20.0 /*stop_cm*/, 25.0 /*clear_cm*/);
+    //ultrasonic_start_monitor_task(100 /*poll ms*/, 20.0 /*stop_cm*/, 25.0 /*clear_cm*/);
     
     printf("\n=== INITIAL SENSOR CHECK ===\n");
     sleep_ms(500);
@@ -83,43 +83,43 @@ int main() {
     bool obstacle_active = false;
     const double STOP_CM = 20.0;
     const double CLEAR_CM = 25.0;
-    const int POLL_MS = 100;
+    const int POLL_MS = 20;
+    
     while (1) {
         // Read sensor for telemetry only
         uint16_t raw_value = line_sensor_read_raw();
         
-        // Drive straight - both motors same speed
-        motor_set_speed(BASE_SPEED, BASE_SPEED);
         
         // Telemetry
         if (to_ms_since_boot(get_absolute_time()) - telemetry_timer >= TELEMETRY_INTERVAL_MS) {
             telemetry_timer = to_ms_since_boot(get_absolute_time());
             
             float distance = encoder_get_distance_m();
-            
+            /*
             printf("\n=== STRAIGHT MODE ===\n");
             printf("Raw ADC: %u\n", raw_value);
             printf("Motors: L=%.2f  R=%.2f (equal speeds)\n", BASE_SPEED, BASE_SPEED);
             printf("Distance: %.2f m\n", distance);
             printf("*** DRIVING STRAIGHT - NO LINE FOLLOWING ***\n");
             printf("==========================\n");
+            */
+            
         }
 
         if ((int)(to_ms_since_boot(get_absolute_time()) - last_ultra_ms) >= POLL_MS) {
             last_ultra_ms = to_ms_since_boot(get_absolute_time());
-            double d = ultrasonic_get_distance_cm(); // from drivers/ultrasonic.c
+            double d = ultrasonic_get_stable_distance_cm(3, 10);
+            printf("Ultrasonic Distance measured: %.2f cm\n", d);
             if (d > 0.0 && !obstacle_active && d <= STOP_CM) {
+                motor_set_speed(0.0f, 0.0f);
                 obstacle_active = true;
-                motor_stop();            // or motor_set_speed(0,0)
             } else if (obstacle_active && d >= CLEAR_CM) {
                 obstacle_active = false;
-                motor_set_speed(BASE_SPEED, BASE_SPEED);
             }
         }
-
-        // apply motors only if not obstacle_active
-        if (!obstacle_active) motor_set_speed(BASE_SPEED, BASE_SPEED);
-        else motor_set_speed(0.0f, 0.0f);
+        if (!obstacle_active){
+            motor_set_speed(BASE_SPEED, BASE_SPEED);
+        }
         
         sleep_ms(LOOP_DELAY_MS);
     }

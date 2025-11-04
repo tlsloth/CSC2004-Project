@@ -13,6 +13,7 @@ add_executable(demo3
         drivers/state.c
         drivers/ir_sensor.c
         drivers/ultrasonic.c
+        drivers/servo.c
 )
 target_include_directories(demo3 PRIVATE
 ${CMAKE_CURRENT_LIST_DIR}
