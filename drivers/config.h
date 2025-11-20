@@ -3,7 +3,7 @@
 
 // WiFi Configuration
 #define WIFI_SSID "Zenden"
-#define WIFI_PASSWORD "0102034"
+#define WIFI_PASSWORD "01020304"
 
 // MQTT Configuration
 #define MQTT_BROKER_IP "192.168.1.100"  // Your MQTT broker IP

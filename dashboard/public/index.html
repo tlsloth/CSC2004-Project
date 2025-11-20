@@ -284,17 +284,25 @@
     <script>
         const socket = io();
         
-        // Connection status
-        socket.on('connect', () => {
+        // MQTT connection status (from server)
+        socket.on('mqtt-status', (data) => {
             const status = document.getElementById('connectionStatus');
-            status.className = 'status connected';
-            status.textContent = '✅ Connected to MQTT Broker';
+            if (data.connected) {
+                status.className = 'status connected';
+                status.textContent = '✅ Connected to MQTT Broker';
+            } else {
+                status.className = 'status disconnected';
+                status.textContent = '⚠️ Disconnected from MQTT Broker';
+            }
+        });
+        
+        // Socket.IO connection (browser to dashboard server)
+        socket.on('connect', () => {
+            console.log('Connected to dashboard server');
         });
         
         socket.on('disconnect', () => {
-            const status = document.getElementById('connectionStatus');
-            status.className = 'status disconnected';
-            status.textContent = '⚠️ Disconnected from MQTT Broker';
+            console.log('Disconnected from dashboard server');
         });
         
         // State updates
