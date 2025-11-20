@@ -1,4 +1,19 @@
+cmake_minimum_required(VERSION 3.13)
+
+# Pull in SDK (must be before project)
+include(pico_sdk_import.cmake)
 include(FreeRTOS_Kernel_import.cmake)
+
+project(car_project C CXX ASM)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+
+# Set board type to Pico W for Wi-Fi support
+set(PICO_BOARD pico_w)
+
+# Initialize the SDK
+pico_sdk_init()
+
 add_executable(car_project
     main.c
     drivers/barcode.c
@@ -46,6 +61,8 @@ target_link_libraries(car_project_line_following
     hardware_gpio
     hardware_pwm
     hardware_i2c
+    pico_cyw43_arch_lwip_threadsafe_background
+    pico_lwip_mqtt
     FreeRTOS-Kernel-Heap4
 )
 

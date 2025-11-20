@@ -4,7 +4,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 
 // MQTT Configuration - update this to match your broker
-const MQTT_BROKER = 'mqtt://192.168.1.100:1883';
+const MQTT_BROKER = 'mqtt://localhost:1883';
 const client = mqtt.connect(MQTT_BROKER);
 
 // Express setup
@@ -18,6 +18,8 @@ app.use(express.static('public'));
 client.on('connect', () => {
     console.log('Connected to MQTT broker');
     client.subscribe('robot/line/#');
+    client.subscribe('robot/barcode');
+    client.subscribe('robot/obstacle');
 });
 
 // Forward MQTT messages to web clients

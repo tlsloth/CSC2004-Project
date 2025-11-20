@@ -30,7 +30,7 @@ typedef void (*barcode_callback_t)(const char* decoded_str, barcode_command_t cm
 
 // --- Public API Functions used by main.c ---
 void barcode_init_local(void);
-void barcode_start_scanning_local(void);
+void barcode_set_scanning_active_local(bool active);
 void barcode_set_callback_local(barcode_callback_t callback);
 void barcode_update_local(void);
 

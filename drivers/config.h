@@ -2,8 +2,8 @@
 #define CONFIG_H
 
 // WiFi Configuration
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID "Zenden"
+#define WIFI_PASSWORD "0102034"
 
 // MQTT Configuration
 #define MQTT_BROKER_IP "192.168.1.100"  // Your MQTT broker IP
@@ -15,5 +15,7 @@
 #define MQTT_TOPIC_STATE "robot/line/state"
 #define MQTT_TOPIC_SPEED "robot/line/speed"
 #define MQTT_TOPIC_ERROR "robot/line/error"
+#define MQTT_TOPIC_BARCODE "robot/barcode"
+#define MQTT_TOPIC_OBSTACLE "robot/obstacle"
 
 #endif // CONFIG_H

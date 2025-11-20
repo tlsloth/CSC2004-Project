@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Line Following Dashboard</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .status {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .status.connected {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .status.disconnected {
+            background: #f44336;
+            color: white;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .metric:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .metric-value {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+        
+        .barcode-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .barcode-item {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        
+        .speed-bars {
+            margin-top: 15px;
+        }
+        
+        .speed-bar {
+            margin: 10px 0;
+        }
+        
+        .speed-bar-label {
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        
+        .speed-bar-track {
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .speed-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+        }
+        
+        .state-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .state-straight {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .state-turning {
+            background: #FF9800;
+            color: white;
+        }
+        
+        .obstacle-detected {
+            color: #f44336 !important;
+            font-weight: bold;
+        }
+        
+        .obstacle-clear {
+            color: #4CAF50 !important;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .updating {
+            animation: pulse 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Robot Line Following Dashboard</h1>
+        
+        <div class="status disconnected" id="connectionStatus">
+            ⚠️ Disconnected from MQTT Broker
+        </div>
+        
+        <div class="grid">
+            <!-- State Card -->
+            <div class="card">
+                <h2>📍 Robot State</h2>
+                <div class="metric">
+                    <span class="metric-label">State:</span>
+                    <span class="metric-value" id="state">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Edge Tracking:</span>
+                    <span class="metric-value" id="edge">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Heading:</span>
+                    <span class="metric-value" id="heading">-°</span>
+                </div>
+            </div>
+            
+            <!-- PID Error Card -->
+            <div class="card">
+                <h2>🎯 PID Control</h2>
+                <div class="metric">
+                    <span class="metric-label">Error:</span>
+                    <span class="metric-value" id="error">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Correction:</span>
+                    <span class="metric-value" id="correction">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">P:</span>
+                    <span class="metric-value" id="p">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">I:</span>
+                    <span class="metric-value" id="i">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">D:</span>
+                    <span class="metric-value" id="d">-</span>
+                </div>
+            </div>
+            
+            <!-- Speed Card -->
+            <div class="card">
+                <h2>⚡ Motor Speeds</h2>
+                <div class="speed-bars">
+                    <div class="speed-bar">
+                        <div class="speed-bar-label">Left Motor: <span id="leftSpeed">0%</span></div>
+                        <div class="speed-bar-track">
+                            <div class="speed-bar-fill" id="leftBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="speed-bar">
+                        <div class="speed-bar-label">Right Motor: <span id="rightSpeed">0%</span></div>
+                        <div class="speed-bar-track">
+                            <div class="speed-bar-fill" id="rightBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="metric" style="margin-top: 15px;">
+                        <span class="metric-label">Base Speed:</span>
+                        <span class="metric-value" id="baseSpeed">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Position Card -->
+            <div class="card">
+                <h2>📏 Position</h2>
+                <div class="metric">
+                    <span class="metric-label">Distance Traveled:</span>
+                    <span class="metric-value" id="distance">0.00 m</span>
+                </div>
+            </div>
+            
+            <!-- Obstacle Card -->
+            <div class="card">
+                <h2>🚧 Obstacle Detection</h2>
+                <div class="metric">
+                    <span class="metric-label">Status:</span>
+                    <span class="metric-value" id="obstacleStatus">No obstacle</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Distance:</span>
+                    <span class="metric-value" id="obstacleDistance">- cm</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Width:</span>
+                    <span class="metric-value" id="obstacleWidth">- cm</span>
+                </div>
+            </div>
+            
+            <!-- Barcode Card -->
+            <div class="card" style="grid-column: span 2;">
+                <h2>📊 Barcode Detections</h2>
+                <div class="barcode-list" id="barcodeList">
+                    <p style="text-align: center; color: #999; padding: 20px;">No barcodes detected yet...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const socket = io();
+        
+        // Connection status
+        socket.on('connect', () => {
+            const status = document.getElementById('connectionStatus');
+            status.className = 'status connected';
+            status.textContent = '✅ Connected to MQTT Broker';
+        });
+        
+        socket.on('disconnect', () => {
+            const status = document.getElementById('connectionStatus');
+            status.className = 'status disconnected';
+            status.textContent = '⚠️ Disconnected from MQTT Broker';
+        });
+        
+        // State updates
+        socket.on('robot/line/state', (data) => {
+            document.getElementById('state').textContent = data.state;
+            document.getElementById('state').className = 'metric-value state-badge ' + 
+                (data.state === 'STRAIGHT' ? 'state-straight' : 'state-turning');
+            document.getElementById('edge').textContent = data.edge;
+            document.getElementById('heading').textContent = data.heading.toFixed(1) + '°';
+        });
+        
+        // Error updates
+        socket.on('robot/line/error', (data) => {
+            document.getElementById('error').textContent = data.error.toFixed(3);
+            document.getElementById('correction').textContent = data.correction.toFixed(3);
+            document.getElementById('p').textContent = data.p.toFixed(2);
+            document.getElementById('i').textContent = data.i.toFixed(2);
+            document.getElementById('d').textContent = data.d.toFixed(2);
+        });
+        
+        // Speed updates
+        socket.on('robot/line/speed', (data) => {
+            const leftPct = (data.left * 100).toFixed(0);
+            const rightPct = (data.right * 100).toFixed(0);
+            
+            document.getElementById('leftSpeed').textContent = leftPct + '%';
+            document.getElementById('rightSpeed').textContent = rightPct + '%';
+            document.getElementById('baseSpeed').textContent = (data.base * 100).toFixed(0) + '%';
+            
+            document.getElementById('leftBar').style.width = leftPct + '%';
+            document.getElementById('rightBar').style.width = rightPct + '%';
+        });
+        
+        // Position updates
+        socket.on('robot/line/position', (data) => {
+            document.getElementById('distance').textContent = data.distance.toFixed(2) + ' m';
+        });
+        
+        // Barcode updates
+        const barcodes = [];
+        socket.on('robot/barcode', (data) => {
+            const timestamp = new Date().toLocaleTimeString();
+            barcodes.unshift({ code: data.barcode, time: timestamp });
+            
+            // Keep only last 10
+            if (barcodes.length > 10) barcodes.pop();
+            
+            const listHtml = barcodes.map(b => 
+                `<div class="barcode-item">${b.time} - <strong>${b.code}</strong></div>`
+            ).join('');
+            
+            document.getElementById('barcodeList').innerHTML = listHtml;
+        });
+        
+        // Obstacle updates
+        socket.on('robot/obstacle', (data) => {
+            const statusEl = document.getElementById('obstacleStatus');
+            const distanceEl = document.getElementById('obstacleDistance');
+            const widthEl = document.getElementById('obstacleWidth');
+            
+            if (data.detected) {
+                statusEl.textContent = '⚠️ OBSTACLE DETECTED';
+                statusEl.className = 'metric-value obstacle-detected';
+                distanceEl.textContent = data.distance.toFixed(1) + ' cm';
+                widthEl.textContent = data.width.toFixed(1) + ' cm';
+            } else {
+                statusEl.textContent = '✅ Clear';
+                statusEl.className = 'metric-value obstacle-clear';
+                distanceEl.textContent = '- cm';
+                widthEl.textContent = '- cm';
+            }
+        });
+    </script>
+</body>
+</html>

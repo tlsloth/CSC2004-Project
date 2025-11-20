@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include "pico/stdlib.h"
+#include "pico/cyw43_arch.h"
 
 // Hardware drivers
 #include "drivers/barcode.h"
@@ -11,13 +12,23 @@
 #include "drivers/pid.h"
 #include "drivers/ir_sensor.h"
 #include "drivers/imu.h"
+#include "drivers/config.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
 
+// MQTT
+#include "lwip/apps/mqtt.h"
+#include "lwip/ip_addr.h"
+
 
 // Task handle for barcode task
 static TaskHandle_t barcode_task_handle = NULL;
+
+// MQTT client and connection state
+static mqtt_client_t *mqtt_client = NULL;
+static volatile bool mqtt_connected = false;
+static ip_addr_t mqtt_broker_ip;
 
 // ===== State Machine =====
 typedef enum {
@@ -49,10 +60,43 @@ void barcode_scan_finished(void) {
     g_barcode_log_end_pending = true;
 }
 
+// MQTT connection callback
+static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection_status_t status) {
+    (void)arg;
+    if (status == MQTT_CONNECT_ACCEPTED) {
+        printf("[MQTT] Connected to broker\n");
+        mqtt_connected = true;
+    } else {
+        printf("[MQTT] Connection failed: %d\n", status);
+        mqtt_connected = false;
+    }
+    fflush(stdout);
+}
+
+// MQTT publish complete callback
+static void mqtt_pub_request_cb(void *arg, err_t result) {
+    (void)arg;
+    if (result != ERR_OK) {
+        printf("[MQTT] Publish error: %d\n", result);
+    }
+}
+
 static void on_barcode_detected_callback(const char *decoded_str, barcode_command_t cmd) {
     (void)cmd;
     printf("%s\n", decoded_str);
     fflush(stdout);
+    
+    // Publish barcode to MQTT
+    if (mqtt_connected && mqtt_client) {
+        char payload[128];
+        snprintf(payload, sizeof(payload), "{\"barcode\":\"%s\"}", decoded_str);
+        err_t err = mqtt_publish(mqtt_client, "robot/barcode", payload, strlen(payload), 
+                                 0, 0, mqtt_pub_request_cb, NULL);
+        if (err != ERR_OK) {
+            printf("[MQTT] Failed to publish barcode: %d\n", err);
+        }
+    }
+    
     // ensure scan finished flag cleared
     barcode_scan_finished();
 }
@@ -186,22 +230,41 @@ void line_following_task(void *pvParameters) {
         motor_set_speed(left_speed, right_speed);
 
         // ----- Telemetry -----
-        // if (to_ms_since_boot(get_absolute_time()) - telemetry_timer >= TELEMETRY_INTERVAL_MS) {
-        //     telemetry_timer = to_ms_since_boot(get_absolute_time());
-        //     float distance = encoder_get_distance_m();
-        //     float p, i, d;
-        //     pid_get_heading_gains(&p, &i, &d);
+        if (to_ms_since_boot(get_absolute_time()) - telemetry_timer >= TELEMETRY_INTERVAL_MS) {
+            telemetry_timer = to_ms_since_boot(get_absolute_time());
+            float distance = encoder_get_distance_m();
+            float p, i, d;
+            pid_get_heading_gains(&p, &i, &d);
 
-        //     const char* state_str = (robot_state == ROBOT_STATE_TURNING) ? "TURNING" : "STRAIGHT";
+            const char* state_str = (robot_state == ROBOT_STATE_TURNING) ? "TURNING" : "STRAIGHT";
 
-        //     printf("\n=== PID LINE FOLLOWING (Analog IR) ===\n");
-        //     printf("State: %s | Raw: %u | Error: %.3f | Heading: %.1f | Edge: %s\n", state_str, raw_value, error, imu_data.heading, EDGE_TO_CHECK);
-        //     printf("P=%.2f  I=%.2f  D=%.2f\n", p, i, d);
-        //     printf("Correction: %.3f\n", correction);
-        //     printf("Motors: L=%.2f  R=%.2f\n", left_speed, right_speed);
-        //     printf("Distance: %.2f m\n", distance);
-        //     printf("==========================\n");
-        // }
+            // Publish telemetry to MQTT
+            if (mqtt_connected && mqtt_client) {
+                char payload[256];
+                
+                // State
+                snprintf(payload, sizeof(payload), 
+                         "{\"state\":\"%s\",\"edge\":\"%s\",\"heading\":%.1f}",
+                         state_str, EDGE_TO_CHECK, imu_data.heading);
+                mqtt_publish(mqtt_client, MQTT_TOPIC_STATE, payload, strlen(payload), 0, 0, NULL, NULL);
+                
+                // Error
+                snprintf(payload, sizeof(payload), 
+                         "{\"error\":%.3f,\"correction\":%.3f,\"p\":%.2f,\"i\":%.2f,\"d\":%.2f}",
+                         error, correction, p, i, d);
+                mqtt_publish(mqtt_client, MQTT_TOPIC_ERROR, payload, strlen(payload), 0, 0, NULL, NULL);
+                
+                // Speed
+                snprintf(payload, sizeof(payload), 
+                         "{\"left\":%.2f,\"right\":%.2f,\"base\":%.2f}",
+                         left_speed, right_speed, BASE_SPEED);
+                mqtt_publish(mqtt_client, MQTT_TOPIC_SPEED, payload, strlen(payload), 0, 0, NULL, NULL);
+                
+                // Position
+                snprintf(payload, sizeof(payload), "{\"distance\":%.2f}", distance);
+                mqtt_publish(mqtt_client, MQTT_TOPIC_POSITION, payload, strlen(payload), 0, 0, NULL, NULL);
+            }
+        }
 
 
         vTaskDelay(pdMS_TO_TICKS(LOOP_DELAY_MS));
@@ -212,7 +275,51 @@ int main() {
     stdio_init_all();
     sleep_ms(2000); // Wait for USB serial
 
-    printf("\n=== PID Line Following Robot (Analog IR) ===\n");
+    printf("\n=== PID Line Following Robot (Analog IR) with MQTT ===\n");
+
+    // Initialize Wi-Fi
+    if (cyw43_arch_init()) {
+        printf("[ERROR] Failed to initialize Wi-Fi\n");
+        return 1;
+    }
+    
+    cyw43_arch_enable_sta_mode();
+    printf("[WIFI] Connecting to %s...\n", WIFI_SSID);
+    
+    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
+        printf("[ERROR] Failed to connect to Wi-Fi\n");
+        return 1;
+    }
+    
+    printf("[WIFI] Connected successfully\n");
+    
+    // Initialize MQTT
+    mqtt_client = mqtt_client_new();
+    if (!mqtt_client) {
+        printf("[ERROR] Failed to create MQTT client\n");
+        return 1;
+    }
+    
+    // Parse broker IP
+    if (!ip4addr_aton(MQTT_BROKER_IP, &mqtt_broker_ip)) {
+        printf("[ERROR] Invalid MQTT broker IP\n");
+        return 1;
+    }
+    
+    // Connect to MQTT broker
+    struct mqtt_connect_client_info_t ci;
+    memset(&ci, 0, sizeof(ci));
+    ci.client_id = MQTT_CLIENT_ID;
+    
+    err_t err = mqtt_client_connect(mqtt_client, &mqtt_broker_ip, MQTT_BROKER_PORT, 
+                                    mqtt_connection_cb, NULL, &ci);
+    if (err != ERR_OK) {
+        printf("[ERROR] Failed to start MQTT connection: %d\n", err);
+        return 1;
+    }
+    
+    printf("[MQTT] Connecting to broker at %s:%d...\n", MQTT_BROKER_IP, MQTT_BROKER_PORT);
+    sleep_ms(2000); // Give MQTT time to connect
 
     // Initialize hardware
     motor_init();
