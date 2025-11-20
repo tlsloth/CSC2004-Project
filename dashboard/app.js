@@ -4,7 +4,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 
 // MQTT Configuration - update this to match your broker
-const MQTT_BROKER = 'mqtt://172.20.10.11:1883';
+const MQTT_BROKER = 'mqtt://172.20.10.2:1883';
 const client = mqtt.connect(MQTT_BROKER);
 
 let mqttConnected = false;

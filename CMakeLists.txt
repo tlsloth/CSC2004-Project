@@ -1,19 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
-
-# Pull in SDK (must be before project)
-include(pico_sdk_import.cmake)
 include(FreeRTOS_Kernel_import.cmake)
-
-project(car_project C CXX ASM)
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
-
-# Set board type to Pico W for Wi-Fi support
-set(PICO_BOARD pico_w)
-
-# Initialize the SDK
-pico_sdk_init()
-
 add_executable(car_project
     main.c
     drivers/barcode.c
@@ -22,6 +7,7 @@ add_executable(car_project
     drivers/pid.c
     drivers/ir_sensor.c
     drivers/imu.c
+    straight_mode.c
 )
 
 add_executable(car_project_line_following
@@ -32,6 +18,7 @@ add_executable(car_project_line_following
     drivers/pid.c
     drivers/ir_sensor.c
     drivers/imu.c
+    straight_mode.c
 )
 
 target_include_directories(car_project PRIVATE

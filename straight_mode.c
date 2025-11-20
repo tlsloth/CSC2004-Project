@@ -9,14 +9,14 @@
 #include "drivers/imu.h"
 
 // Configuration from main_reference.c
-#define BASE_SPEED 0.30f
+#define BASE_SPEED 0.25f
 #define LOOP_DELAY_MS 10
 #define TELEMETRY_INTERVAL_MS 200
 #define HEADING_SMOOTH 5
-#define KP_BEARING 0.5f
+#define KP_BEARING 0.1f
 #define KI_BEARING 0.0f
-#define KD_BEARING 0.0f
-#define MAX_CORRECTION 0.20f
+#define KD_BEARING 0.05f
+#define MAX_CORRECTION 0.10f
 
 void drive_straight_task(float target_heading) {
     uint32_t telemetry_timer = 0;
@@ -82,7 +82,7 @@ void drive_straight_task(float target_heading) {
             if (right_speed < 0.0f) right_speed = 0.0f;
             if (right_speed > 1.0f) right_speed = 1.0f;
 
-            motor_set_speed(left_speed, right_speed);
+            motor_set_speed(BASE_SPEED, BASE_SPEED);
 
             // ----- Telemetry -----
             if (to_ms_since_boot(get_absolute_time()) - telemetry_timer >= TELEMETRY_INTERVAL_MS) {

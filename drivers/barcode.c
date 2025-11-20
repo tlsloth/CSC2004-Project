@@ -215,6 +215,7 @@ static void push_segment(uint16_t dur_ms, bool ended_is_bar) {
 
         // Trigger decode handling (calls user callback). Let the decode handler
         // perform cleanup via reset_scan_state so barcode_scan_finished is invoked exactly once.
+        reset_scan_state("stop character detected");
         barcode_on_decode_complete(decoded_msg, barcode_parse_command_local(decoded_msg));
         
         // barcode_on_decode_complete will reset state; just return
