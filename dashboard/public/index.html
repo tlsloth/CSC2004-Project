@@ -307,30 +307,37 @@
         
         // State updates
         socket.on('robot/line/state', (data) => {
-            document.getElementById('state').textContent = data.state;
+            const state = typeof data === 'string' ? data : data.state;
+            document.getElementById('state').textContent = state;
             document.getElementById('state').className = 'metric-value state-badge ' + 
-                (data.state === 'STRAIGHT' ? 'state-straight' : 'state-turning');
-            document.getElementById('edge').textContent = data.edge;
-            document.getElementById('heading').textContent = data.heading.toFixed(1) + '°';
+                (state === 'STRAIGHT' ? 'state-straight' : 'state-turning');
         });
         
         // Error updates
         socket.on('robot/line/error', (data) => {
-            document.getElementById('error').textContent = data.error.toFixed(3);
-            document.getElementById('correction').textContent = data.correction.toFixed(3);
-            document.getElementById('p').textContent = data.p.toFixed(2);
-            document.getElementById('i').textContent = data.i.toFixed(2);
-            document.getElementById('d').textContent = data.d.toFixed(2);
+            const errorValue = typeof data === 'string' ? parseFloat(data) : data.error;
+            document.getElementById('error').textContent = errorValue.toFixed(3);
         });
         
         // Speed updates
         socket.on('robot/line/speed', (data) => {
-            const leftPct = (data.left * 100).toFixed(0);
-            const rightPct = (data.right * 100).toFixed(0);
+            let leftSpeed, rightSpeed;
+            
+            if (typeof data === 'string') {
+                // Parse "0.30,0.30" format
+                const speeds = data.split(',');
+                leftSpeed = parseFloat(speeds[0]);
+                rightSpeed = parseFloat(speeds[1]);
+            } else {
+                leftSpeed = data.left;
+                rightSpeed = data.right;
+            }
+            
+            const leftPct = (leftSpeed * 100).toFixed(0);
+            const rightPct = (rightSpeed * 100).toFixed(0);
             
             document.getElementById('leftSpeed').textContent = leftPct + '%';
             document.getElementById('rightSpeed').textContent = rightPct + '%';
-            document.getElementById('baseSpeed').textContent = (data.base * 100).toFixed(0) + '%';
             
             document.getElementById('leftBar').style.width = leftPct + '%';
             document.getElementById('rightBar').style.width = rightPct + '%';
@@ -338,14 +345,16 @@
         
         // Position updates
         socket.on('robot/line/position', (data) => {
-            document.getElementById('distance').textContent = data.distance.toFixed(2) + ' m';
+            const distance = typeof data === 'string' ? parseFloat(data) : data.distance;
+            document.getElementById('distance').textContent = distance.toFixed(2) + ' m';
         });
         
         // Barcode updates
         const barcodes = [];
         socket.on('robot/barcode', (data) => {
+            const barcode = typeof data === 'string' ? data : data.barcode;
             const timestamp = new Date().toLocaleTimeString();
-            barcodes.unshift({ code: data.barcode, time: timestamp });
+            barcodes.unshift({ code: barcode, time: timestamp });
             
             // Keep only last 10
             if (barcodes.length > 10) barcodes.pop();
