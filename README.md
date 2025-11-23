@@ -59,7 +59,7 @@ The project utilises a modular structure, separating hardware drivers, control l
     ```bash
     make
     ```
-    This will generate the required `.uf2` file (e.g., `main.uf2`).
+    This will generate the required `.uf2` file (`car_project_line_following.uf2`).
 
 ### 2. Running Instructions
 
