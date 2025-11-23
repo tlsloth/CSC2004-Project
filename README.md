@@ -26,9 +26,8 @@ The project utilises a modular structure, separating hardware drivers, control l
 | `drivers/ultrasonic.c` | Interfaces with the HC-SR04 Ultrasonic Sensor for distance measurement. |
 | `drivers/servo.c` | Controls the Servo used to sweep the ultrasonic sensor for **obstacle width measurement**. |
 | `drivers/barcode.c` | Controls the logic for reading and decoding barcodes placed on the track |
-
-| **FreeRTOS/** | FreeRTOS Kernel source and configuration files. |
-| **lwip/** | Lightweight IP stack for Wi-Fi and MQTT network communication. |
+| `FreeRTOSConfig.h` | 	Configuration header for the FreeRTOS kernel (defines task priorities, stack sizes, tick rates, and memory allocation schemes).|
+| `lwipopts.h` |    Configuration header for the Lightweight IP (LwIP) stack to tune memory usage and enable specific features for MQTT/Wi-Fi. |
 
 ---
 
