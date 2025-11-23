@@ -64,7 +64,7 @@ The project utilises a modular structure, separating hardware drivers, control l
 ### 2. Running Instructions
 
 1.  **Put the Pico W into Bootloader Mode:** Hold the **BOOTSEL** button while connecting the Pico W to your PC via USB.
-2.  **Drag and Drop:** Copy the generated `main.uf2` file into the mounted RPI-RP2 drive.
+2.  **Drag and Drop:** Copy the generated `car_project_line_following.uf2` file into the mounted RPI-RP2 drive.
 3.  **Reboot:** The Pico W will reboot, load the firmware, and begin executing `main()`.
 
 ### 3. Testing and Demo Summary
