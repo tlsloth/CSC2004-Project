@@ -13,7 +13,7 @@
 #define BARCODE_BAR_IS_LOW 0
 #define BARCODE_SAMPLE_MS 1
 #define BARCODE_VERIFY_MS 5 
-#define BARCODE_RESET_MS 500
+#define BARCODE_RESET_MS 400
 #define BARCODE_MAX_LEN 64
 
 // Barcode commands (for the callback)

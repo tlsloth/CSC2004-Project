@@ -306,61 +306,52 @@
         });
         
         // State updates
-        socket.on('robot/line/state', (data) => {
-            const state = typeof data === 'string' ? data : data.state;
-            document.getElementById('state').textContent = state;
+        socket.on('robot/state', (data) => {
+            document.getElementById('state').textContent = data.state;
             document.getElementById('state').className = 'metric-value state-badge ' + 
-                (state === 'STRAIGHT' ? 'state-straight' : 'state-turning');
+                (data.state === 'STRAIGHT' ? 'state-straight' : 'state-turning');
+            document.getElementById('edge').textContent = data.edge;
+            document.getElementById('heading').textContent = data.heading + '°';
         });
         
         // Error updates
-        socket.on('robot/line/error', (data) => {
-            const errorValue = typeof data === 'string' ? parseFloat(data) : data.error;
-            document.getElementById('error').textContent = errorValue.toFixed(3);
+        socket.on('robot/error', (data) => {
+            document.getElementById('error').textContent = data.error;
+            document.getElementById('correction').textContent = data.correction;
+            document.getElementById('p').textContent = data.p;
+            document.getElementById('i').textContent = data.i;
+            document.getElementById('d').textContent = data.d;
         });
         
         // Speed updates
-        socket.on('robot/line/speed', (data) => {
-            let leftSpeed, rightSpeed;
-            
-            if (typeof data === 'string') {
-                // Parse "0.30,0.30" format
-                const speeds = data.split(',');
-                leftSpeed = parseFloat(speeds[0]);
-                rightSpeed = parseFloat(speeds[1]);
-            } else {
-                leftSpeed = data.left;
-                rightSpeed = data.right;
-            }
-            
-            const leftPct = (leftSpeed * 100).toFixed(0);
-            const rightPct = (rightSpeed * 100).toFixed(0);
+        socket.on('robot/speed', (data) => {
+            const leftPct = (data.left * 100);
+            const rightPct = (data.right * 100);
             
             document.getElementById('leftSpeed').textContent = leftPct + '%';
             document.getElementById('rightSpeed').textContent = rightPct + '%';
+            document.getElementById('baseSpeed').textContent = (data.base * 100) + '%';
             
             document.getElementById('leftBar').style.width = leftPct + '%';
             document.getElementById('rightBar').style.width = rightPct + '%';
         });
         
         // Position updates
-        socket.on('robot/line/position', (data) => {
-            const distance = typeof data === 'string' ? parseFloat(data) : data.distance;
-            document.getElementById('distance').textContent = distance.toFixed(2) + ' m';
+        socket.on('robot/position', (data) => {
+            document.getElementById('distance').textContent = data.distance + ' m';
         });
         
         // Barcode updates
         const barcodes = [];
         socket.on('robot/barcode', (data) => {
-            const barcode = typeof data === 'string' ? data : data.barcode;
             const timestamp = new Date().toLocaleTimeString();
-            barcodes.unshift({ code: barcode, time: timestamp });
+            barcodes.unshift({ barcode: data.barcode, command: data.command, time: timestamp });
             
             // Keep only last 10
             if (barcodes.length > 10) barcodes.pop();
             
             const listHtml = barcodes.map(b => 
-                `<div class="barcode-item">${b.time} - <strong>${b.code}</strong></div>`
+                `<div class="barcode-item">${b.time} - <strong>${b.barcode}</strong> - Command: ${b.command}</div>`
             ).join('');
             
             document.getElementById('barcodeList').innerHTML = listHtml;
@@ -375,8 +366,8 @@
             if (data.detected) {
                 statusEl.textContent = '⚠️ OBSTACLE DETECTED';
                 statusEl.className = 'metric-value obstacle-detected';
-                distanceEl.textContent = data.distance.toFixed(1) + ' cm';
-                widthEl.textContent = data.width.toFixed(1) + ' cm';
+                distanceEl.textContent = data.distance + ' cm';
+                widthEl.textContent = data.width + ' cm';
             } else {
                 statusEl.textContent = '✅ Clear';
                 statusEl.className = 'metric-value obstacle-clear';

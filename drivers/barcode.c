@@ -166,8 +166,8 @@ static void push_segment(uint16_t dur_ms, bool ended_is_bar) {
     win[win_len] = (seg_t){dur_ms, (uint8_t)ended_is_bar};
 
     // Debug log AFTER validation/appending
-    printf("[DEBUG_SEGMENT] Segment %d Accepted: %s, Dur=%u ms\n",
-           win_len, ended_is_bar ? "BAR" : "SPACE", dur_ms);
+    //printf("[DEBUG_SEGMENT] Segment %d Accepted: %s, Dur=%u ms\n",
+           //win_len, ended_is_bar ? "BAR" : "SPACE", dur_ms);
     fflush(stdout);
 
     win_len++;
@@ -206,20 +206,17 @@ static void push_segment(uint16_t dur_ms, bool ended_is_bar) {
 
     // SCAN_READ state
     if (ch == '*') {
-        printf("[BARCODE] STOP detected\n");
-        printf("[BARCODE] Decoded: \"%s\"\n", decoded_msg);
-        fflush(stdout);
-        
-        // Save copy for later retrieval
-        strncpy(last_decoded_msg, decoded_msg, BARCODE_MAX_LEN);
-
-        // Trigger decode handling (calls user callback). Let the decode handler
-        // perform cleanup via reset_scan_state so barcode_scan_finished is invoked exactly once.
-        reset_scan_state("stop character detected");
-        barcode_on_decode_complete(decoded_msg, barcode_parse_command_local(decoded_msg));
-        
-        // barcode_on_decode_complete will reset state; just return
-        return;
+        if(strlen(decoded_msg) == 0) {
+            // Ignore stray stop if no data
+            printf("[BARCODE] START detected, waiting for message.\n");
+            return;
+        }
+        else{
+            printf("[BARCODE] STOP detected\n");
+            printf("[BARCODE] Decoded: \"%s\"\n", decoded_msg);
+            fflush(stdout);
+            barcode_on_decode_complete(decoded_msg, barcode_parse_command_local(decoded_msg));
+        }
     }
 
     // Append character
@@ -257,8 +254,8 @@ static bool timer_cb(struct repeating_timer *t) {
         return true;
 
     // --- DEBUG LOG: Edge Detected/Verified ---
-    printf("[DEBUG_EDGE] Edge Verified: %s -> %s, Stable for %u ms\n",
-           stable_level ? "HIGH" : "LOW", raw_level ? "HIGH" : "LOW", BARCODE_VERIFY_MS);
+    // printf("[DEBUG_EDGE] Edge Verified: %s -> %s, Stable for %u ms\n",
+    //        stable_level ? "HIGH" : "LOW", raw_level ? "HIGH" : "LOW", BARCODE_VERIFY_MS);
     fflush(stdout);
     // --- END DEBUG LOG ---
 

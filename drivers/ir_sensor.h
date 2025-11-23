@@ -7,13 +7,14 @@
 
 // ===== Configuration =====
 #define LINE_ADC_PIN     28      // GPIO connected to line sensor (ADC2)
+#define LINE_DIGITAL_PIN 7
 #define LINE_ADC_INPUT   2       // ADC input channel for the sensor
 #define LINE_THRESHOLD   1350    // Calibrated ADC threshold for line detection
 
 // ===== Line sensor states =====
 typedef enum {
-    LINE_WHITE = 0,
-    LINE_BLACK
+    LINE_WHITE = -1,
+    LINE_BLACK = 1
 } line_state_t;
 
 // ===== Initialization =====
@@ -33,4 +34,5 @@ void line_sensor_set_threshold(uint16_t new_threshold);
 // Returns a float from -1.0 to 1.0 representing deviation from the line
 float line_sensor_get_error(void);
 
-#endif // IR_SENSOR_H
+#endif 
+// IR_SENSOR_H

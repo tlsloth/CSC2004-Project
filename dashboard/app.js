@@ -4,7 +4,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 
 // MQTT Configuration - update this to match your broker
-const MQTT_BROKER = 'mqtt://172.20.10.11:1883';
+const MQTT_BROKER = 'mqtt://172.20.10.3:1883';
 const client = mqtt.connect(MQTT_BROKER);
 
 let mqttConnected = false;
@@ -21,7 +21,8 @@ client.on('connect', () => {
     mqttConnected = true;
     console.log('Connected to MQTT broker');
     io.emit('mqtt-status', { connected: true });
-    client.subscribe('robot/line/#');
+    client.subscribe('robot/position');
+    client.subscribe('robot/state');
     client.subscribe('robot/barcode');
     client.subscribe('robot/obstacle');
 });
@@ -40,9 +41,13 @@ client.on('close', () => {
 
 // Forward MQTT messages to web clients
 client.on('message', (topic, message) => {
-    const payload = message.toString();
-    console.log(`Received ${topic}: ${payload}`);
-    io.emit(topic, payload);
+    try {
+        const data = JSON.parse(message.toString());
+        console.log(`MQTT message on ${topic}:`, data);
+        io.emit(topic, data);
+    } catch (e) {
+        console.error('Parse error:', e);
+    }
 });
 
 // Send MQTT status to new clients
