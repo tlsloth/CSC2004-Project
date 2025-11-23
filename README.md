@@ -18,7 +18,7 @@ The project utilises a modular structure, separating hardware drivers, control l
 | :--- | :--- |
 | **main_line_following.c** | Initialises all hardware components, configures the IMU's cardinal bearings, creates and starts the FreeRTOS tasks (Control, Line Following, Barcode Reading, Obstacle sensing, Obstacle Avoidance), and starts the scheduler. Contains the **`line_following_task`** (lower priority). Implements the core **PID line-following loop**, managing the robot's steering (`STATE_LINE_FOLLOWING`/`STATE_STRAIGHT_FOR_SCAN`/`STATE_STRAIGHT_FOR_SCAN`) and reacting to barcode detection flags set by the driver. |
 | **drivers/** | Contains all low-level hardware abstraction layers (HALs). |
-| `drivers/imu.c` | Handles communication with the MPU-9250 sensor, provides **raw and filtered** acceleration, gyroscope, and heading data, and includes the critical `imu_get_corrected_yaw()` function. |
+| `drivers/imu.c` | Handles communication with the LSM303DLHC sensor, provides **raw and filtered** acceleration, and heading data, and includes the critical `imu_get_corrected_yaw()` function. |
 | `drivers/motor.c` | Controls the DC motors via the Motor Controller using PWM outputs for speed and direction. |
 | `drivers/encoder.c` | Processes pulses from the IR-based Wheel Encoders to calculate real-time **speed, RPM, and distance travelled**. |
 | `drivers/ir_sensor.c` | Manages the IR-based 'line' detector for line-following, providing digital/analog line position feedback, and the dedicated sensor for **barcode decoding**. |
@@ -63,9 +63,9 @@ The project utilises a modular structure, separating hardware drivers, control l
 
 ### 2. Running Instructions
 
-1.  **Put the Pico W into Bootloader Mode:** Hold the **BOOTSEL** button while connecting the Pico W to your PC via USB.
+1.  **Put the Robo Pico into Bootloader Mode:** Hold the **BOOTSEL** button while connecting the Robo Pico to your PC via USB.
 2.  **Drag and Drop:** Copy the generated `car_project_line_following.uf2` file into the mounted RPI-RP2 drive.
-3.  **Reboot:** The Pico W will reboot, load the firmware, and begin executing `main()`.
+3.  **Reboot:** The Robo Pico will reboot, load the firmware, and begin executing `main()`.
 
 ### 3. Testing and Demo Summary
 
