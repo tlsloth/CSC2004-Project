@@ -16,9 +16,7 @@ The project utilises a modular structure, separating hardware drivers, control l
 
 | File/Folder | Purpose |
 | :--- | :--- |
-| **main.c** | Initialises all hardware components, configures the IMU's cardinal bearings, creates and starts the FreeRTOS tasks (Control, Line Following, Barcode Timeout), and starts the scheduler. |
-| **control_task.c** | Contains the top-level **`control_task`** (main execution loop). Manages high-priority state transitions, specifically handling **Obstacle Detection & Avoidance** (`STATE_SCANNING` and `STATE_CORRECTING` transitions), suspending other tasks during manoeuvres. |
-| **line_following_task.c** | Contains the **`line_following_task`** (lower priority). Implements the core **PID line-following loop**, managing the robot's steering (`ROBOT_STATE_STRAIGHT`/`ROBOT_STATE_TURNING`) and reacting to barcode detection flags set by the driver. |
+| **main_line_following.c** | Initialises all hardware components, configures the IMU's cardinal bearings, creates and starts the FreeRTOS tasks (Control, Line Following, Barcode Reading, Obstacle sensing, Obstacle Avoidance), and starts the scheduler. Contains the **`line_following_task`** (lower priority). Implements the core **PID line-following loop**, managing the robot's steering (`STATE_LINE_FOLLOWING`/`STATE_STRAIGHT_FOR_SCAN`/`STATE_STRAIGHT_FOR_SCAN`) and reacting to barcode detection flags set by the driver. | |
 | **drivers/** | Contains all low-level hardware abstraction layers (HALs). |
 | `drivers/imu.c` | Handles communication with the MPU-9250 sensor, provides **raw and filtered** acceleration, gyroscope, and heading data, and includes the critical `imu_get_corrected_yaw()` function. |
 | `drivers/motor.c` | Controls the DC motors via the Motor Controller using PWM outputs for speed and direction. |
@@ -26,7 +24,9 @@ The project utilises a modular structure, separating hardware drivers, control l
 | `drivers/ir_sensor.c` | Manages the IR-based 'line' detector for line-following, providing digital/analog line position feedback, and the dedicated sensor for **barcode decoding**. |
 | `drivers/pid.c` | Implements the **PID algorithm** (Proportional-Integral-Derivative) used for both line-following steering and IMU-assisted straight-line heading maintenance. |
 | `drivers/ultrasonic.c` | Interfaces with the HC-SR04 Ultrasonic Sensor for distance measurement. |
-| `drivers/servo.c` | Controls the TowerPro Servo used to sweep the ultrasonic sensor for **obstacle width measurement**. |
+| `drivers/servo.c` | Controls the Servo used to sweep the ultrasonic sensor for **obstacle width measurement**. |
+| `drivers/barcode.c` | Controls the logic for reading and decoding barcodes placed on the track |
+
 | **FreeRTOS/** | FreeRTOS Kernel source and configuration files. |
 | **lwip/** | Lightweight IP stack for Wi-Fi and MQTT network communication. |
 
