@@ -1,5 +1,5 @@
 # CSC2004-Project
-# 🤖 Intelligent Autonomous Line-Following Robot Project
+#  Intelligent Autonomous Line-Following Robot Project
 
 ## Project Description
 
@@ -10,7 +10,7 @@ This project develops an **intelligent autonomous robot** capable of navigating 
 
 ---
 
-## 📁 Project Structure Summary
+##  Project Structure Summary
 
 The project utilises a modular structure, separating hardware drivers, control logic, and application-level state machines.
 
@@ -31,7 +31,7 @@ The project utilises a modular structure, separating hardware drivers, control l
 
 ---
 
-## ⚙️ Compilation, Running, and Testing
+##  Compilation, Running, and Testing
 
 ### Prerequisites
 * **Microcontroller:** Raspberry Pi Pico W.
