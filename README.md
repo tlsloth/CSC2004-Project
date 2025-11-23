@@ -1,4 +1,4 @@
-# CSC2004-Project
+# INF2004 Project Documentation
 #  Intelligent Autonomous Line-Following Robot Project
 
 ## Project Description
