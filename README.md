@@ -3,8 +3,8 @@
 
 ## Project Description
 
-This project develops an **intelligent autonomous robot** capable of navigating a track and performing advanced tasks under real-time constraints. The core functionality is **line following** using a PID controller, augmented by several key features:
-1.  *Encoded Navigation:** Interpreting barcodes to execute complex, IMU-assisted turns (e.g., Left/Right).
+This project develops an **intelligent autonomous robot** capable of navigating a track and performing advanced tasks under real-time constraints. The core functionality is **line following** using an IR sensor and assisted with IMU, augmented by several key features:
+1.  **Encoded Navigation:** Interpreting barcodes to execute complex, IMU-assisted turns (e.g., Left/Right).
 2.  **Obstacle Avoidance:** Using an ultrasonic sensor mounted on a servo to detect, measure, and detour around obstacles.
 3.  **Real-time Telemetry:** Communicating live data (speed, heading, status) to a remote dashboard via **MQTT over Wi-Fi**.
 
@@ -16,7 +16,7 @@ The project utilises a modular structure, separating hardware drivers, control l
 
 | File/Folder | Purpose |
 | :--- | :--- |
-| **main_line_following.c** | Initialises all hardware components, configures the IMU's cardinal bearings, creates and starts the FreeRTOS tasks (Control, Line Following, Barcode Reading, Obstacle sensing, Obstacle Avoidance), and starts the scheduler. Contains the **`line_following_task`** (lower priority). Implements the core **PID line-following loop**, managing the robot's steering (`STATE_LINE_FOLLOWING`/`STATE_STRAIGHT_FOR_SCAN`/`STATE_STRAIGHT_FOR_SCAN`) and reacting to barcode detection flags set by the driver. | |
+| **main_line_following.c** | Initialises all hardware components, configures the IMU's cardinal bearings, creates and starts the FreeRTOS tasks (Control, Line Following, Barcode Reading, Obstacle sensing, Obstacle Avoidance), and starts the scheduler. Contains the **`line_following_task`** (lower priority). Implements the core **PID line-following loop**, managing the robot's steering (`STATE_LINE_FOLLOWING`/`STATE_STRAIGHT_FOR_SCAN`/`STATE_STRAIGHT_FOR_SCAN`) and reacting to barcode detection flags set by the driver. |
 | **drivers/** | Contains all low-level hardware abstraction layers (HALs). |
 | `drivers/imu.c` | Handles communication with the MPU-9250 sensor, provides **raw and filtered** acceleration, gyroscope, and heading data, and includes the critical `imu_get_corrected_yaw()` function. |
 | `drivers/motor.c` | Controls the DC motors via the Motor Controller using PWM outputs for speed and direction. |
@@ -74,6 +74,6 @@ The project is validated through a series of progressive demos:
 
 | Demo Phase | Key Features to Test | Success Criteria |
 | :--- | :--- | :--- |
-| **Week 6: Individual Driver** | Motor Encoder (Speed/Distance), IR Sensor (Line/Thickness), Ultrasonic + Servo (Basic distance/sweep), IMU (Raw data). | Verified sensor readings and motor control (no PID required yet). |
-| **Week 10: Partial Integration** | **PID Control, IMU Filtering & Heading, Line Following, Barcode Command, Obstacle Avoidance.** | Robot maintains straight path with IMU correction. Correctly follows the line, interprets barcodes, and executes accurate turns. Stops at the obstacle, scans, navigates around it, and rejoins the line. |
+| **Week 6: Individual Driver** | Motor Encoder (Speed/Distance), IR Sensor (Line/Thickness), Ultrasonic Distance Measurement, IMU (Raw data). | Verified sensor readings and motor control (no PID required yet). |
+| **Week 10: Partial Integration** | **PID Control, IMU Filtering & Heading, Line Following, Barcode Command, Obstacle Width Measurement.** | Robot maintains straight path with IMU correction. Correctly follows the line, interprets barcodes, and executes accurate turns. Stops at the obstacle, scans, and measures the width. |
 | **Week 13: Final Demo Run** | Full autonomous operation of all integrated features. | Successful completion of the final track, demonstrating reliable barcode navigation, obstacle detour, and seamless line re-acquisition. |
